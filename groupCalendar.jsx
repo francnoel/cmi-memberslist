@@ -532,8 +532,8 @@ function ManageCalendarModal({ ctx, calendar }) {
               <div className="form-group">
                 <label className="form-label">Code String *</label>
                 <input className="form-input" value={newCode}
-                  onChange={e => setNewCode(e.target.value.toUpperCase())}
-                  placeholder="e.g. MYCLASS2026"
+                  onChange={e => setNewCode(e.target.value)}
+                  placeholder="e.g. myClass2026"
                   style={{ fontFamily:"monospace", letterSpacing:1 }} />
               </div>
               <div className="form-group">
