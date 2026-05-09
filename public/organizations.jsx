@@ -681,6 +681,108 @@ React.useEffect(() => {
   React.useEffect(() => {
     if (activeSection === "members") loadMembers();
   }, [activeSection, orgId]);
+// ── Join Requests state (pending approvals)
+const [joinRequests,        setJoinRequests]        = React.useState([]);
+const [joinRequestsLoading, setJoinRequestsLoading] = React.useState(false);
+const [requestActionLoading, setRequestActionLoading] = React.useState(null); // requestId being acted on
+
+
+async function loadJoinRequests() {
+  setJoinRequestsLoading(true);
+  try {
+    // Step 1: get list of open request IDs
+    const res = await apiCall(
+      "/organizations.v2.OrganizationJoinRequestService/GetOpenJoinRequests",
+      { organizationId: Number(orgId) },
+      sessionId
+    );
+    const ids = res.joinRequestEventIds || [];
+    if (ids.length === 0) { setJoinRequests([]); return; }
+
+    // Step 2: for each ID, fetch request detail → then response detail → then user name
+    const resolved = await Promise.all(ids.map(async (reqId) => {
+      try {
+        // Get the join request (gives us join_response_event_id + actor_user_id)
+        const req = await apiCall(
+          "/organizations.v2.OrganizationJoinRequestService/GetJoinRequest",
+          { joinRequestEventId: reqId },
+          sessionId
+        );
+
+        // Get the join response (gives us responder_user_id + their answer)
+        const resp = await apiCall(
+          "/organizations.v2.OrganizationJoinResponseService/GetJoinResponse",
+          { joinResponseEventId: req.joinResponseEventId },
+          sessionId
+        );
+
+        const applicantUserId = resp.responderUserId;
+        let applicantName = `User #${applicantUserId}`;
+        let answer = resp.response || "";
+
+        // Resolve the applicant's name
+        try {
+          const u = await apiCall("/users.v2.UserService/GetUser", { userId: applicantUserId }, sessionId);
+          applicantName = [u.firstName, u.middleName, u.lastName].filter(Boolean).join(" ") || applicantName;
+        } catch(e) {}
+
+        return {
+          joinRequestEventId: reqId,
+          joinResponseEventId: req.joinResponseEventId,
+          applicantUserId,
+          applicantName,
+          answer,
+        };
+      } catch(e) { return null; }
+    }));
+
+    setJoinRequests(resolved.filter(Boolean));
+  } catch(e) {
+    console.error("[JoinRequests] error:", e);
+    setJoinRequests([]);
+  } finally {
+    setJoinRequestsLoading(false);
+  }
+}
+
+async function handleApprove(req) {
+  setRequestActionLoading(req.joinRequestEventId);
+  try {
+    await apiCall(
+      "/organizations.v2.OrganizationJoinRequestService/ResolveJoinRequest",
+      { organizationId: Number(orgId), requesterUserId: req.applicantUserId, accept: true },
+      sessionId
+    );
+    showToast(`Approved ${req.applicantName}!`);
+    setJoinRequests(prev => prev.filter(r => r.joinRequestEventId !== req.joinRequestEventId));
+  } catch(e) {
+    showToast(e.message || "Failed to approve.", "error");
+  } finally {
+    setRequestActionLoading(null);
+  }
+}
+
+async function handleReject(req) {
+  setRequestActionLoading(req.joinRequestEventId);
+  try {
+    await apiCall(
+      "/organizations.v2.OrganizationJoinRequestService/ResolveJoinRequest",
+      { organizationId: Number(orgId), requesterUserId: req.applicantUserId, accept: false },
+      sessionId
+    );
+    showToast(`Rejected ${req.applicantName}.`);
+    setJoinRequests(prev => prev.filter(r => r.joinRequestEventId !== req.joinRequestEventId));
+  } catch(e) {
+    showToast(e.message || "Failed to reject.", "error");
+  } finally {
+    setRequestActionLoading(null);
+  }
+}
+
+
+React.useEffect(() => {
+  if (activeSection === "join-requests") loadJoinRequests();
+}, [activeSection, orgId]);
 
   // ── Join Prompt state
   const [currentPromptId,   setCurrentPromptId]   = React.useState(null);
@@ -813,9 +915,12 @@ React.useEffect(() => {
         <div style={{ padding:"0 24px", borderBottom:"1px solid var(--border)", display:"flex", gap:4, background:"var(--surface2)" }}>
           <button style={sectionBtnStyle("calendars")} onClick={() => setActiveSection("calendars")}>📅 Shared Calendars</button>
           <button style={sectionBtnStyle("join-prompt")} onClick={() => setActiveSection("join-prompt")}>📋 Join Questionnaire</button>
+          <button style={sectionBtnStyle("join-requests")} onClick={() => setActiveSection("join-requests")}>
+            📥 Join Requests{joinRequests.length > 0 ? ` (${joinRequests.length})` : ""}
+          </button>
           <button style={sectionBtnStyle("members")} onClick={() => setActiveSection("members")}>👥 Members</button>
-          <button style={sectionBtnStyle("activity")}    onClick={() => setActiveSection("activity")}>📋 Activity</button>
-          <button style={sectionBtnStyle("settings")}  onClick={() => setActiveSection("settings")}>⚙️ Settings</button>
+          <button style={sectionBtnStyle("activity")} onClick={() => setActiveSection("activity")}>📋 Activity</button>
+          <button style={sectionBtnStyle("settings")} onClick={() => setActiveSection("settings")}>⚙️ Settings</button>
         </div>
 
         <div className="modal-body">
@@ -991,6 +1096,84 @@ React.useEffect(() => {
               )}
             </div>
           )}
+
+        {/* ── JOIN REQUESTS SECTION ── */}
+{activeSection === "join-requests" && (
+  <div>
+    <div style={{ fontSize:13, color:"var(--text2)", marginBottom:16, lineHeight:1.6 }}>
+      Pending join requests for <strong style={{ color:"var(--text)" }}>{org.name}</strong>. Approve or reject each applicant.
+    </div>
+
+    {joinRequestsLoading ? (
+      <div style={{ textAlign:"center", padding:"32px 0", color:"var(--text3)", fontSize:13 }}>
+        Loading requests…
+      </div>
+    ) : joinRequests.length === 0 ? (
+      <div style={{ textAlign:"center", padding:"40px 0", color:"var(--text3)" }}>
+        <div style={{ fontSize:32, marginBottom:8 }}>📭</div>
+        <div style={{ fontSize:13 }}>No pending join requests.</div>
+      </div>
+    ) : (
+      <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
+        {joinRequests.map((req, i) => {
+          const isActing = requestActionLoading === req.joinRequestEventId;
+          return (
+            <div key={req.joinRequestEventId || i} style={{
+              padding:"14px 16px", borderRadius:12,
+              background:"var(--surface2)", border:"1px solid var(--border)",
+            }}>
+              {/* Applicant header */}
+              <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom: req.answer ? 10 : 0 }}>
+                <div style={{
+                  width:34, height:34, borderRadius:"50%", flexShrink:0,
+                  background: PALETTE[i % PALETTE.length] + "33",
+                  border:`1.5px solid ${PALETTE[i % PALETTE.length]}55`,
+                  display:"flex", alignItems:"center", justifyContent:"center",
+                  fontSize:13, fontWeight:700, color: PALETTE[i % PALETTE.length],
+                }}>
+                  {req.applicantName?.[0]?.toUpperCase() || "?"}
+                </div>
+                <div style={{ flex:1 }}>
+                  <div style={{ fontSize:14, fontWeight:700, color:"var(--text)" }}>{req.applicantName}</div>
+                  <div style={{ fontSize:11, color:"var(--text3)" }}>Pending approval</div>
+                </div>
+                <div style={{ display:"flex", gap:8 }}>
+                  <button
+                    className="btn btn-sm"
+                    style={{ background:"rgba(52,211,153,0.15)", color:"var(--green)", border:"1px solid rgba(52,211,153,0.35)", fontWeight:700 }}
+                    disabled={isActing}
+                    onClick={() => handleApprove(req)}>
+                    {isActing ? "…" : "✓ Approve"}
+                  </button>
+                  <button
+                    className="btn btn-danger btn-sm"
+                    disabled={isActing}
+                    onClick={() => handleReject(req)}>
+                    {isActing ? "…" : "✕ Reject"}
+                  </button>
+                </div>
+              </div>
+
+              {/* Applicant's answer */}
+              {req.answer && (
+                <div style={{
+                  marginTop:10, padding:"10px 12px", borderRadius:8,
+                  background:"var(--surface3)", border:"1px solid var(--border2)",
+                  fontSize:13, color:"var(--text2)", lineHeight:1.6, whiteSpace:"pre-wrap",
+                }}>
+                  <div style={{ fontSize:10, fontWeight:700, letterSpacing:1.2, textTransform:"uppercase", color:"var(--text3)", marginBottom:5 }}>
+                    📝 Their Answer
+                  </div>
+                  {req.answer}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    )}
+  </div>
+)}
 
           {/* ── SETTINGS SECTION ── */}
           {activeSection === "settings" && (

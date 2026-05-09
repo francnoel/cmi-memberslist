@@ -635,7 +635,11 @@ function AuthPage({ onLogin }) {
             </div>
           </div>
 
-          <div className="auth-hero-footer">University of San Carlos · DCISM · {new Date().getFullYear()}</div>
+          <div className="auth-hero-footer" style={{ lineHeight:1.8 }}>
+            <span style={{ opacity:0.75, fontSize:"0.92em" }}>Instructor: Sir Paule Glenn Acuin</span><br />
+            <span style={{ opacity:0.75, fontSize:"0.92em" }}>CIS 1202 · Web Development I</span><br />
+            University of San Carlos · DCISM · {new Date().getFullYear()}
+          </div>
         </div>
       </div>
 
@@ -1020,68 +1024,129 @@ function SettingsPage({ ctx }) {
 }
 
 
-// ─── DAY EVENTS MODAL ─────────────────────────────────────────────────────────
 function DayEventsModal({ ctx, date }) {
   const { myEvents, myCalendars, closeModal, setModal } = ctx;
   const cals = myCalendars();
-  const dayEvts = myEvents()
-    .filter(e => sameDay(e.startTime, date.toISOString()) && !(e.title||"").startsWith("TASK:"))
+  const allDayEvts = myEvents()
+    .filter(e => sameDay(e.startTime, date.toISOString()))
     .sort((a,b) => new Date(a.startTime) - new Date(b.startTime));
+
+  const dayEvts  = allDayEvts.filter(e => !(e.title||"").startsWith("TASK:"));
+  const dayTasks = allDayEvts.filter(e =>  (e.title||"").startsWith("TASK:"));
+
+  const [tasksExpanded, setTasksExpanded] = React.useState(true);
   const dayLabel = date.toLocaleDateString("en-PH", { weekday:"long", month:"long", day:"numeric", year:"numeric" });
+
+  function renderEvent(e) {
+    const cal = cals.find(c => strId(c.id) === strId(e.calendarId));
+    const evColor = cal?.color || "var(--accent)";
+    return (
+      <div key={e.id} className="event-item"
+        style={{ borderLeft:`3px solid ${evColor}`, paddingLeft:14, marginBottom:4, borderRadius:"0 8px 8px 0", cursor:"pointer" }}
+        onClick={() => { closeModal(); setTimeout(() => setModal({ type:"event-detail", data:e }), 50); }}>
+        <div className="event-dot" style={{ background:evColor }} />
+        <div className="event-info">
+          <div className="event-title">{e.isImportant ? "⭐ " : ""}{e.title}</div>
+          <div className="event-meta">
+            {fmtTime(e.startTime)}–{fmtTime(e.endTime)}
+            {cal ? <span style={{ marginLeft:8, color:evColor, fontWeight:600 }}>· {cal.name}</span> : ""}
+            {e.location ? ` · 📍 ${e.location}` : ""}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  function renderTask(e) {
+    const title = (e.title||"").replace(/^TASK:/, "");
+    // Parse checklist progress
+    let pct = null;
+    if (e.description) {
+      const sep = "---CHECKLIST---";
+      const stripped = e.description.replace(/\nSTATUS:(done|in-progress|not-started)/, "");
+      const idx = stripped.indexOf(sep);
+      if (idx !== -1) {
+        const lines = stripped.slice(idx + sep.length).trim().split("\n").filter(Boolean);
+        if (lines.length > 0) pct = Math.round((lines.filter(l => l.startsWith("[x]")).length / lines.length) * 100);
+      }
+    }
+    return (
+      <div key={e.id} className="event-item"
+        style={{ borderLeft:"3px solid var(--yellow)", paddingLeft:14, marginBottom:4, borderRadius:"0 8px 8px 0", cursor:"pointer" }}
+        onClick={() => { closeModal(); setTimeout(() => setModal({ type:"event-detail", data:e }), 50); }}>
+        <div className="event-dot" style={{ background:"var(--yellow)" }} />
+        <div className="event-info">
+          <div className="event-title" style={{ color:"var(--yellow)" }}>{title}</div>
+          {pct !== null && (
+            <div className="event-meta" style={{ display:"flex", alignItems:"center", gap:6 }}>
+              <div style={{ flex:1, height:4, background:"var(--border)", borderRadius:99, overflow:"hidden", maxWidth:80 }}>
+                <div style={{ height:"100%", width:`${pct}%`, background: pct===100 ? "var(--green)" : "var(--yellow)", borderRadius:99 }} />
+              </div>
+              <span style={{ color:"var(--yellow)", fontWeight:700 }}>{pct}%</span>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="modal-overlay" onClick={closeModal}>
-      <div className="modal modal-lg" onClick={e=>e.stopPropagation()}>
+      <div className="modal modal-lg" onClick={e => e.stopPropagation()}>
         <div className="modal-header">
-          <div style={{display:"flex",alignItems:"center",gap:10,flex:1}}>
-            <span style={{fontSize:20}}>📅</span>
+          <div style={{ display:"flex", alignItems:"center", gap:10, flex:1 }}>
+            <span style={{ fontSize:20 }}>📅</span>
             <div>
               <div className="modal-title">{dayLabel}</div>
-              <div style={{fontSize:12,color:"var(--text3)",marginTop:2}}>{dayEvts.length} event{dayEvts.length!==1?"s":""}</div>
+              <div style={{ fontSize:12, color:"var(--text3)", marginTop:2 }}>
+                {dayEvts.length} event{dayEvts.length !== 1 ? "s" : ""}
+                {dayTasks.length > 0 ? ` · ${dayTasks.length} task${dayTasks.length !== 1 ? "s" : ""}` : ""}
+              </div>
             </div>
           </div>
           <button className="close-btn" onClick={closeModal}>✕</button>
         </div>
 
-        {/* ── + Add Event bar at the top ── */}
-        <div style={{padding:"0 24px 0 24px"}}>
+        <div style={{ padding:"0 24px" }}>
           <button
             className="btn btn-primary"
-            style={{width:"100%",borderRadius:10,padding:"10px 0",fontSize:14,fontWeight:700,marginBottom:4,display:"flex",alignItems:"center",justifyContent:"center",gap:8}}
-            onClick={()=>{closeModal();setTimeout(()=>setModal({type:"create-event",data:{date}}),50);}}>
-            <span style={{fontSize:18}}>＋</span> Add Event on {date.toLocaleDateString("en-PH",{month:"short",day:"numeric"})}
+            style={{ width:"100%", borderRadius:10, padding:"10px 0", fontSize:14, fontWeight:700, marginBottom:4, display:"flex", alignItems:"center", justifyContent:"center", gap:8 }}
+            onClick={() => { closeModal(); setTimeout(() => setModal({ type:"create-event", data:{ date } }), 50); }}>
+            <span style={{ fontSize:18 }}>＋</span> Add Event on {date.toLocaleDateString("en-PH", { month:"short", day:"numeric" })}
           </button>
         </div>
 
         <div className="modal-body">
-          {dayEvts.length === 0
-            ? <div className="empty-state" style={{padding:"24px 0"}}>
-                <div className="empty-icon">✨</div>
-                <div className="empty-title">No events this day</div>
-                <div style={{fontSize:13,color:"var(--text3)"}}>Tap the button above to add one!</div>
+          {/* Events section */}
+          {dayEvts.length === 0 && dayTasks.length === 0 ? (
+            <div className="empty-state" style={{ padding:"24px 0" }}>
+              <div className="empty-icon">✨</div>
+              <div className="empty-title">No events this day</div>
+              <div style={{ fontSize:13, color:"var(--text3)" }}>Tap the button above to add one!</div>
+            </div>
+          ) : (<>
+            {dayEvts.length > 0 && (
+              <div style={{ marginBottom: dayTasks.length > 0 ? 16 : 0 }}>
+                {dayEvts.map(renderEvent)}
               </div>
-            : dayEvts.map(e => {
-                    const isTask = (e.title || "").startsWith("TASK:");
-                    const cal = cals.find(c=>strId(c.id)===strId(e.calendarId));
-                    const evColor = isTask ? "var(--yellow)" : (cal?.color || "var(--accent)");
-                return (
-                  <div key={e.id} className="event-item"
-                    style={{borderLeft:`3px solid ${evColor}`,paddingLeft:14,marginBottom:4,borderRadius:"0 8px 8px 0",cursor:"pointer"}}
-                    onClick={()=>{closeModal();setTimeout(()=>setModal({type:"event-detail",data:e}),50);}}>
-                    <div className="event-dot" style={{background:evColor}} />
-                    <div className="event-info">
-                      <div className="event-title">{e.isImportant?"⭐ ":""}{e.title}</div>
-                      <div className="event-meta">
-                        {fmtTime(e.startTime)}–{fmtTime(e.endTime)}
-                        {cal ? <span style={{marginLeft:8,color:evColor,fontWeight:600}}>· {cal.name}</span> : ""}
-                        {e.location ? ` · 📍 ${e.location}` : ""}
-                      </div>
-                    </div>
-                  </div>
-                );
-              })
-          }
+            )}
+
+            {/* Tasks section — visually separated, collapsible */}
+            {dayTasks.length > 0 && (<>
+              <div
+                onClick={() => setTasksExpanded(p => !p)}
+                style={{ display:"flex", alignItems:"center", gap:8, marginBottom:10, cursor:"pointer", userSelect:"none" }}>
+                <div style={{ flex:1, height:1, background:"var(--border)" }} />
+                <span style={{ fontSize:11, fontWeight:600, color:"var(--yellow)", letterSpacing:0.8, textTransform:"uppercase", whiteSpace:"nowrap" }}>
+                  {tasksExpanded ? "▴" : "▾"} Tasks ({dayTasks.length})
+                </span>
+                <div style={{ flex:1, height:1, background:"var(--border)" }} />
+              </div>
+              {tasksExpanded && dayTasks.map(renderTask)}
+            </>)}
+          </>)}
         </div>
+
         <div className="modal-footer">
           <button className="btn btn-ghost" onClick={closeModal}>Close</button>
         </div>

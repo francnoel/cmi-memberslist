@@ -57,78 +57,95 @@ function CalendarPage({ ctx }) {
     "July","August","September","October","November","December",
   ];
 
+
+
+  //
   return (
-    <div>
-      {/* Sub-feature: Calendar Filter Toggle — click a pill to show/hide a calendar */}
-        <div className="cal-filter" style={{ display:"flex", gap:8, flexWrap:"wrap", marginBottom:14, alignItems:"center" }}>        {cals.map(c => {
-          const active = visibleCals.includes(c.id);
+  <div>
+    {/* Month navigation header — on top */}
+    <div className="cal-header" style={{ display:"flex", alignItems:"center", gap:8, flexWrap:"nowrap", marginBottom:14 }}>
+      <button className="btn-icon" onClick={() => setViewDate(new Date(year, month-1, 1))}>←</button>
+      <button className="btn-icon" onClick={() => setViewDate(new Date(year, month+1, 1))}>→</button>
+      <div style={{ flex:1 }} />
+      <div className="cal-month" style={{ whiteSpace:"nowrap" }}>{monthNames[month]} {year}</div>
+      <button className="btn btn-ghost btn-sm" style={{ whiteSpace:"nowrap" }} onClick={() => setViewDate(new Date())}>Today</button>
+      <div style={{ flex:1 }} />
+      <button className="btn btn-primary btn-sm"
+        style={{ width:"fit-content", minWidth:100, whiteSpace:"nowrap" }}
+        onClick={() => setModal({ type:"create-event" })}>+ Event</button>
+    </div>
+
+    {/* Calendar filter pills + tasks toggle — below */}
+    <div className="cal-filter" style={{ display:"flex", gap:8, flexWrap:"wrap", marginBottom:14, alignItems:"center" }}>
+      {cals.map(c => {
+        const active = visibleCals.includes(c.id);
+        return (
+          <div key={c.id}
+            onClick={() => {
+              if (selectedCals === null) setSelectedCals(cals.map(x=>x.id).filter(id=>id!==c.id));
+              else if (active) setSelectedCals(selectedCals.filter(id=>id!==c.id));
+              else setSelectedCals([...selectedCals, c.id]);
+            }}
+            style={{ display:"flex", alignItems:"center", gap:5, padding:"4px 10px", borderRadius:20,
+              background:active?"rgba(255,255,255,0.06)":"transparent",
+              border:`1.5px solid ${active ? c.color : "var(--border)"}`,
+              cursor:"pointer", flexShrink:0 }}>
+            <span style={{ width:7, height:7, borderRadius:"50%", background:active?c.color:"var(--text3)" }} />
+            <span style={{ fontSize:11, fontWeight:500, color:active?"var(--text)":"var(--text3)" }}>
+              {c.name}
+            </span>
+          </div>
+        );
+      })}
+      {/* Sub-feature: Org Calendars Filter — one pill per org-shared calendar */}
+      {orgCals.length > 0 && (<>
+        <div style={{ width:1, height:16, background:"var(--border)", flexShrink:0, margin:"0 2px" }} />
+        {orgCals.map(c => {
+          const active = visibleOrgIds.includes(c.id);
           return (
             <div key={c.id}
-              onClick={() => {
-                if (selectedCals === null) setSelectedCals(cals.map(x=>x.id).filter(id=>id!==c.id));
-                else if (active) setSelectedCals(selectedCals.filter(id=>id!==c.id));
-                else setSelectedCals([...selectedCals, c.id]);
-              }}
+              onClick={() => setVisibleOrgCalIds(prev => {
+                const current = prev !== null ? prev : orgCalIds;
+                return current.includes(c.id)
+                  ? current.filter(id => id !== c.id)
+                  : [...current, c.id];
+              })}
+              title={`Org shared: ${c.name}`}
               style={{ display:"flex", alignItems:"center", gap:5, padding:"4px 10px", borderRadius:20,
-                background:active?"rgba(255,255,255,0.06)":"transparent",
-                border:`1.5px solid ${active ? c.color : "var(--border)"}`,
+                background: active ? "rgba(255,255,255,0.06)" : "transparent",
+                border: `1.5px solid ${active ? c.color : "var(--border)"}`,
                 cursor:"pointer", flexShrink:0 }}>
-              <span style={{ width:7, height:7, borderRadius:"50%", background:active?c.color:"var(--text3)" }} />
-              <span style={{ fontSize:11, fontWeight:500, color:active?"var(--text)":"var(--text3)" }}>
-                {c.name.split(" ")[0]}
+              <span style={{ fontSize:9, lineHeight:1, opacity: active ? 1 : 0.4 }}>🏢</span>
+              <span style={{ width:7, height:7, borderRadius:"50%", background: active ? c.color : "var(--text3)" }} />
+              <span style={{ fontSize:11, fontWeight:500, color: active ? "var(--text)" : "var(--text3)" }}>
+                {c.name}
               </span>
             </div>
           );
         })}
-        {/* Sub-feature: Org Calendars Filter — one pill per org-shared calendar */}
-        {orgCals.length > 0 && (<>
-          <div style={{ width:1, height:16, background:"var(--border)", flexShrink:0, margin:"0 2px" }} />
-          {orgCals.map(c => {
-            const active = visibleOrgIds.includes(c.id);
-            return (
-              <div key={c.id}
-                onClick={() => setVisibleOrgCalIds(prev => {
-                  const current = prev !== null ? prev : orgCalIds;
-                  return current.includes(c.id)
-                    ? current.filter(id => id !== c.id)
-                    : [...current, c.id];
-                })}
-                title={`Org shared: ${c.name}`}
-                style={{ display:"flex", alignItems:"center", gap:5, padding:"4px 10px", borderRadius:20,
-                  background: active ? "rgba(255,255,255,0.06)" : "transparent",
-                  border: `1.5px solid ${active ? c.color : "var(--border)"}`,
-                  cursor:"pointer", flexShrink:0 }}>
-                <span style={{ fontSize:9, lineHeight:1, opacity: active ? 1 : 0.4 }}>🏢</span>
-                <span style={{ width:7, height:7, borderRadius:"50%", background: active ? c.color : "var(--text3)" }} />
-                <span style={{ fontSize:11, fontWeight:500, color: active ? "var(--text)" : "var(--text3)" }}>
-                  {c.name.split(" ")[0]}
-                </span>
-              </div>
-            );
-          })}
-        </>)}
+      </>)}
 
-        <div onClick={() => setShowTasks(t => !t)}
-          style={{
-            display:"flex", alignItems:"center", gap:5, padding:"4px 10px", borderRadius:20,
-            background: showTasks ? "rgba(251,191,36,0.12)" : "transparent",
-            border: `1.5px solid ${showTasks ? "var(--yellow)" : "var(--border)"}`,
-            cursor:"pointer", flexShrink:0,
-          }}>
-          <span style={{ width:7, height:7, borderRadius:"50%", background: showTasks ? "var(--yellow)" : "var(--text3)" }} />
-          <span style={{ fontSize:11, fontWeight:500, color: showTasks ? "var(--yellow)" : "var(--text3)" }}>Tasks</span>
-        </div>
-      </div>
+      {/* Pushes tasks toggle to the far right */}
+      <div style={{ flex:1 }} />
 
-      {/* Month navigation header */}
-      <div className="cal-header">
-        <button className="btn-icon" onClick={() => setViewDate(new Date(year, month-1, 1))}>←</button>
-        <button className="btn-icon" onClick={() => setViewDate(new Date(year, month+1, 1))}>→</button>
-        <div className="cal-month">{monthNames[month]} {year}</div>
-        <button className="btn btn-ghost btn-sm" onClick={() => setViewDate(new Date())}>Today</button>
-        <div style={{ flex:1 }} />
-        <button className="btn btn-primary btn-sm" onClick={() => setModal({ type:"create-event" })}>+ Event</button>
+      {/* Vertical divider */}
+      <div style={{ width:1, height:16, background:"var(--border)", flexShrink:0, margin:"0 8px" }} />
+
+      {/* Tasks toggle */}
+      <div
+        onClick={() => setShowTasks(t => !t)}
+        title={showTasks ? "Hide tasks" : "Show tasks on calendar"}
+        style={{
+          display:"flex", alignItems:"center", gap:5,
+          padding:"6px 12px", borderRadius:20, fontSize:12, fontWeight:600,
+          cursor:"pointer", flexShrink:0, transition:"background .15s, color .15s",
+          border: `1.5px solid ${showTasks ? "#fbbf24" : "var(--border)"}`,
+          background: showTasks ? "rgba(251,191,36,0.13)" : "transparent",
+          color: showTasks ? "#fbbf24" : "var(--text3)",
+        }}>
+        ☑ Tasks
       </div>
+    </div>
 
       {/* Sub-feature: Monthly Calendar Grid View */}
       <div className="cal-grid">
@@ -210,6 +227,7 @@ function EventsPage({ ctx }) {
   const [search, setSearch]                   = React.useState("");
   const [filterCal, setFilterCal]             = React.useState("all");
   const [filterImportant, setFilterImportant] = React.useState(false);
+  const [pastExpanded, setPastExpanded] = React.useState(false);
   const cals = myCalendars();
 
   let evts = myEvents().filter(e=>!(e.title||"").startsWith("TASK:")).sort((a,b) => new Date(a.startTime) - new Date(b.startTime));
@@ -239,13 +257,23 @@ function EventsPage({ ctx }) {
           <option value="all">All Calendars</option>
           {cals.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
         </select>
-        <button className={`btn btn-sm ${filterImportant?"btn-primary":"btn-ghost"}`}
-          onClick={() => setFilterImportant(!filterImportant)}>⭐ Important</button>
+        <button
+          onClick={() => setFilterImportant(!filterImportant)}
+          style={{
+            display:"flex", alignItems:"center", gap:5,
+            padding:"6px 12px", borderRadius:20, fontSize:12, fontWeight:600,
+            cursor:"pointer", flexShrink:0, transition:"background .15s, color .15s",
+            border: `1.5px solid ${filterImportant ? "#fbbf24" : "var(--border)"}`,
+            background: filterImportant ? "rgba(251,191,36,0.13)" : "transparent",
+            color: filterImportant ? "#fbbf24" : "var(--text3)",
+          }}>
+          ⭐ Important
+        </button>
       </div>
 
       {/* Create Event button — below search bar */}
       <button className="btn btn-primary btn-sm"
-        style={{ width:"100%", marginBottom:20 }}
+        style={{ display:"block", width:"fit-content", minWidth:160, marginBottom:20, marginLeft:"auto" }}
         onClick={() => setModal({ type:"create-event" })}>+ Create Event</button>
 
       {/* Sub-feature: Upcoming Events List */}
@@ -259,13 +287,55 @@ function EventsPage({ ctx }) {
       )}
 
       {past.length > 0 && (
-        <div className="card" style={{ opacity:.7 }}>
-          <div style={{ fontFamily:"Syne,sans-serif", fontWeight:700, fontSize:15, marginBottom:12, color:"var(--text2)" }}>
-            Past ({past.length})
-          </div>
-          {past.slice(-10).reverse().map(e => <EventListItem key={e.id} event={e} ctx={ctx} showDate full />)}
-        </div>
-      )}
+  <div style={{ marginTop:8 }}>
+    {/* Collapsible header */}
+    <div
+      onClick={() => setPastExpanded(p => !p)}
+      style={{
+        display:"flex", alignItems:"center", gap:8, cursor:"pointer",
+        padding:"6px 4px", userSelect:"none",
+      }}>
+      <div style={{ flex:1, height:1, background:"var(--border)" }} />
+      <span style={{ fontSize:11, fontWeight:600, color:"var(--text3)", letterSpacing:0.8, textTransform:"uppercase", whiteSpace:"nowrap" }}>
+        {pastExpanded ? "▴" : "▾"} Past ({past.length})
+      </span>
+      <div style={{ flex:1, height:1, background:"var(--border)" }} />
+    </div>
+
+    {/* Past events — compact, muted rows, no card elevation */}
+    {pastExpanded && (
+      <div style={{ display:"flex", flexDirection:"column", gap:2, marginTop:6 }}>
+        {past.slice(-10).reverse().map(e => {
+          const cal = ctx.myCalendars().find(c => strId(c.id) === strId(e.calendarId));
+          return (
+            <div key={e.id}
+              onClick={() => ctx.setModal({ type:"event-detail", data:e })}
+              style={{
+                display:"flex", alignItems:"center", gap:10,
+                padding:"5px 10px", borderRadius:6, cursor:"pointer",
+                opacity:0.55, transition:"opacity .15s",
+              }}
+              onMouseEnter={ev => ev.currentTarget.style.opacity = 0.85}
+              onMouseLeave={ev => ev.currentTarget.style.opacity = 0.55}
+            >
+              {/* Thin left stripe instead of a dot */}
+              <div style={{ width:2, height:28, borderRadius:2, background: cal?.color || "var(--text3)", flexShrink:0 }} />
+              <div style={{ flex:1, minWidth:0 }}>
+                <div style={{ fontSize:12, fontWeight:500, color:"var(--text2)", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>
+                  {e.isImportant ? "⭐ " : ""}{e.title}
+                </div>
+                <div style={{ fontSize:11, color:"var(--text3)" }}>
+                  {fmtDate(e.startTime)} · {fmtTime(e.startTime)}–{fmtTime(e.endTime)}
+                  {cal ? ` · ${cal.name}` : ""}
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    )}
+  </div>
+)}
 
       {evts.length === 0 && (
         <div className="empty-state">
@@ -286,12 +356,14 @@ function EventListItem({ event, ctx, showDate, full }) {
   const cal = myCalendars().find(c => strId(c.id) === strId(event.calendarId));
   return (
     <div className="event-item" onClick={() => setModal({ type:"event-detail", data:event })}>
-      <div className="event-dot" style={{ background: cal?.color || "var(--accent)" }} />
-      <div className="event-info">
-        <div className="event-title">
-          {event.isImportant && <span className="event-important">⭐</span>}
-          {event.title}
-        </div>
+        <span style={{ width:18, fontSize:13, flexShrink:0, display:"flex", alignItems:"center", justifyContent:"center" }}>
+          {event.isImportant ? "⭐" : ""}
+        </span>
+        <div className="event-dot" style={{ background: cal?.color || "var(--accent)" }} />
+        <div className="event-info">
+          <div className="event-title">
+            {event.title}
+          </div>
         <div className="event-meta">
           {showDate ? `${fmtDate(event.startTime)} · ` : ""}
           {fmtTime(event.startTime)}–{fmtTime(event.endTime)}
