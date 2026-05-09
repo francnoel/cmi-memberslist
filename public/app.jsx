@@ -509,11 +509,12 @@ function AuthPage({ onLogin }) {
       // LoginUserResponse has no user_id — resolve it via GetSessionUserID → GetUser
       const profile = await fetchUserProfile(sid);
       const user = buildUser(profile, sid);
-      // If profile API didn't return email, inject the one the user typed and persist it
-      if (!user.email && email) {
+      // Always overwrite the cached email with what the user just logged in with
+      // so a changed email is always reflected after re-login
+      if (user.id && email) {
         try { localStorage.setItem(`usc_${user.id}_email`, email); } catch(e) {}
       }
-      const finalUser = user.email ? user : { ...user, email, name: user.name || email, userType: "student" };
+      const finalUser = { ...user, email: email || user.email, name: user.name || email, userType: "student" };
       // Existing login — isNewUser=false (default), tutorial will NOT fire
       onLogin(finalUser, sid, false);
     } catch(e) { setError(e.message || "Login failed. Check your credentials."); }
@@ -926,8 +927,9 @@ function SettingsPage({ ctx }) {
   const [deleteLoading,setDeleteLoading]  =useState(false);
   const [profileError,setProfileError]    =useState("");
   const [loginError,setLoginError]        =useState("");
+  const [confirmDlg,setConfirmDlg]        =useState(null);
 
-  async function saveProfile() {
+  async function doSaveProfile() {
     setProfileError(""); setProfileLoading(true);
     try {
       const body={};
@@ -953,7 +955,7 @@ function SettingsPage({ ctx }) {
     finally { setProfileLoading(false); }
   }
 
-  async function saveLoginInfo() {
+  async function doSaveLoginInfo() {
     setLoginError(""); setLoginLoading(true);
     try {
       const body={};
@@ -961,6 +963,10 @@ function SettingsPage({ ctx }) {
       if(newPassword) body.password=newPassword;
       if(!body.email&&!body.password){setLoginError("Enter a new email or password.");setLoginLoading(false);return;}
       await apiCall("/users.v2.UserService/UpdateLoginUser", body, sessionId);
+      // Clear the cached email so the old value doesn't survive into the next login
+      if(newEmail && currentUser.id) {
+        try { localStorage.setItem(`usc_${currentUser.id}_email`, newEmail); } catch(e) {}
+      }
       showToast("Login info updated! Please sign in again.");
       clearSession();
       setTimeout(() => handleLogout(), 1500);
@@ -968,14 +974,44 @@ function SettingsPage({ ctx }) {
     finally { setLoginLoading(false); }
   }
 
-  async function deleteAccount() {
-    if(!window.confirm("Permanently delete your account? This cannot be undone.")) return;
+  async function doDeleteAccount() {
     setDeleteLoading(true);
     try { await apiCall("/users.v2.UserService/DeleteUser", {}, sessionId); clearSession(); handleLogout(); }
     catch(e) { showToast(e.message||"Failed to delete account.","error"); }
     finally { setDeleteLoading(false); }
   }
 
+  function saveProfile() {
+    setConfirmDlg({
+      message: "Save profile changes?",
+      description: "This will update your display name.",
+      confirmLabel: "Save",
+      onConfirm: doSaveProfile,
+    });
+  }
+
+  function saveLoginInfo() {
+    const body={};
+    if(newEmail)    body.email=newEmail;
+    if(newPassword) body.password=newPassword;
+    if(!body.email&&!body.password){ setLoginError("Enter a new email or password."); return; }
+    setConfirmDlg({
+      message: "Update login info?",
+      description: "You will be signed out and need to log in again with your new credentials.",
+      confirmLabel: "Yes, Update",
+      onConfirm: doSaveLoginInfo,
+    });
+  }
+
+  function deleteAccount() {
+    setConfirmDlg({
+      message: "Delete your account?",
+      description: "This is permanent and cannot be undone. All your data will be lost.",
+      danger: true,
+      confirmLabel: "Yes, Delete",
+      onConfirm: doDeleteAccount,
+    });
+  }
   const ac = loadAvatarColor(currentUser.id, currentUser.name);
   const initials = nameInitials(currentUser.first_name, currentUser.last_name);
 
@@ -1013,10 +1049,28 @@ function SettingsPage({ ctx }) {
           </div>
           <div className="card">
             <div style={{fontFamily:"Syne,sans-serif",fontWeight:700,fontSize:16,marginBottom:14,color:"var(--red)"}}>Danger Zone</div>
+            {confirmDlg && (
+              <ConfirmDialog
+                {...confirmDlg}
+                onClose={() => setConfirmDlg(null)}
+              />
+            )}
             <div style={{display:"flex",gap:10,flexWrap:"wrap"}}>
-              <button className="btn btn-ghost btn-sm" onClick={()=>handleLogout()}>Sign Out</button>
-              <button className="btn btn-ghost btn-sm" onClick={()=>handleLogout(true)}>Sign Out Everywhere</button>
-              <button className="btn btn-danger btn-sm" onClick={deleteAccount} disabled={deleteLoading}>{deleteLoading?"Deleting…":"Delete Account"}</button>
+              <button className="btn btn-ghost btn-sm" onClick={() => setConfirmDlg({
+                message: "Sign out?",
+                description: "You will be returned to the login screen.",
+                confirmLabel: "Sign Out",
+                onConfirm: () => handleLogout(),
+              })}>Sign Out</button>
+              <button className="btn btn-ghost btn-sm" onClick={() => setConfirmDlg({
+                message: "Sign out everywhere?",
+                description: "All active sessions on all devices will be terminated.",
+                confirmLabel: "Sign Out Everywhere",
+                onConfirm: () => handleLogout(true),
+              })}>Sign Out Everywhere</button>
+              <button className="btn btn-danger btn-sm" onClick={deleteAccount} disabled={deleteLoading}>
+                {deleteLoading?"Deleting…":"Delete Account"}
+              </button>
             </div>
           </div>
     </div>
