@@ -24,13 +24,6 @@ function CalendarsPage({ ctx }) {
   const [labelFilter, setLabelFilter] = React.useState("all");
   const [confirmDlg, setConfirmDlg] = React.useState(null);
 
-  const [collapsedGroups, setCollapsedGroups] = React.useState({
-  "This Week": false,
-  "This Month": false,
-  "This Year": false,
-  "Older": false,
-});
-
   // Sort by ID descending so newest calendars appear first.
   // IDs are auto-incremented by the backend, so higher ID = more recently created.
   // .slice() prevents mutating the original state array.
@@ -47,42 +40,6 @@ function CalendarsPage({ ctx }) {
   if (labelFilter !== "all") {
     filtered = filtered.filter(c => c.label === labelFilter);
   }
-
-  function getDateGroup(dateStr) {
-  if (!dateStr) return "Older";
-
-  const now = new Date();
-  const d = new Date(dateStr);
-
-  const diffDays = (now - d) / (1000 * 60 * 60 * 24);
-
-  if (diffDays <= 7) return "This Week";
-
-  if (
-    d.getMonth() === now.getMonth() &&
-    d.getFullYear() === now.getFullYear()
-  ) {
-    return "This Month";
-  }
-
-  if (d.getFullYear() === now.getFullYear()) {
-    return "This Year";
-  }
-
-  return "Older";
-}
-
-const groupedCalendars = {
-  "This Week": [],
-  "This Month": [],
-  "This Year": [],
-  "Older": [],
-};
-
-filtered.forEach(cal => {
-  const key = getDateGroup(cal.updated_at);
-  groupedCalendars[key].push(cal);
-});
 
   // In My Calendars / Joined tabs with no label filter active,
   // hide unlabeled ("none") calendars so they only appear in All
@@ -172,307 +129,86 @@ filtered.forEach(cal => {
         </div>
       )}
 
-    {/* Create Calendar Card */}
-{tab !== "subscribed" && (
-  <div className="cards-grid">
-  <div
-    className="cal-card"
-    style={{
-      border:"1.5px dashed var(--border2)",
-      cursor:"pointer",
-      alignItems:"center",
-      display:"flex",
-      flexDirection:"column",
-      justifyContent:"center",
-      minHeight:120
-    }}
-    onClick={() =>
-      setModal({ type:"create-calendar" })
-    }
-  >
-    <div
-      style={{
-        fontSize:24,
-        marginBottom:6,
-        opacity:.5
-      }}
-    >
-      ＋
-    </div>
-
-    <div
-      style={{
-        color:"var(--text3)",
-        fontSize:13,
-        fontWeight:600
-      }}
-    >
-      Create Calendar
-    </div>
-  </div>
-  </div>
-)}
-
-      {Object.entries(groupedCalendars).map(([group, calendars]) => {
-  if (calendars.length === 0) return null;
-
-  return (
-    <div
-  key={group}
-  style={{
-    marginTop: 18,
-    marginBottom: 28
-  }}
->
-
-      {/* Group Header */}
-      <div
-        onClick={() =>
-          setCollapsedGroups(prev => ({
-            ...prev,
-            [group]: !prev[group],
-          }))
-        }
-        style={{
-          fontSize: 12,
-          fontWeight: 700,
-          color: "var(--text2)",
-          marginBottom: 12,
-          paddingBottom: 8,
-          borderBottom: "1px solid var(--border)",
-          textTransform: "uppercase",
-          letterSpacing: 0.6,
-          cursor: "pointer",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          userSelect: "none",
-        }}
-      >
-        <span>{group}</span>
-
-        <span
-          style={{
-            fontSize: 14,
-            opacity: 0.7,
-            transform: collapsedGroups[group]
-              ? "rotate(-90deg)"
-              : "rotate(0deg)",
-            transition: "transform .2s ease",
-          }}
-        >
-          ▼
-        </span>
-      </div>
-
-      {/* Collapsible Content */}
-      {!collapsedGroups[group] && (
-        <div className="cards-grid">
-
-          {calendars.map(c => {
-
-            
-            const evtCount = myEvents().filter(
-              e => e.calendarId === c.id
-            ).length;
-
-            return (
-              <div key={c.id} className="cal-card">
-
-                <div
-                  style={{
-                    position:"absolute",
-                    top:0,
-                    left:0,
-                    right:0,
-                    height:3,
-                    background:c.color,
-                    borderRadius:"14px 14px 0 0"
-                  }}
-                />
-
-                <div className="cal-card-name">
-                  {c.name}
-                </div>
-
-                <div className="cal-card-type">
-                  {c.isOwner ? "Owner" : "Member"} · {c.description || "No description"}
-                </div>
-
-                <div
-                  style={{
-                    fontSize:13,
-                    color:"var(--text2)",
-                    marginBottom:10
-                  }}
-                >
-                  {evtCount} event{evtCount !== 1 ? "s" : ""}
-                </div>
-
-                {/* Calendar Color Picker */}
-                <div style={{ marginBottom:10 }}>
-                  <div
-                    style={{
-                      fontSize:11,
-                      color:"var(--text3)",
-                      fontWeight:600,
-                      marginBottom:5
-                    }}
-                  >
-                    CALENDAR COLOR
-                  </div>
-
-                  <div
-                    style={{
-                      display:"flex",
-                      gap:5,
-                      flexWrap:"wrap"
-                    }}
-                  >
-                    {PALETTE.map(col => (
-                      <div
-                        key={col}
-                        onClick={() => handleColorChange(c.id, col)}
-                        style={{
-                          width:20,
-                          height:20,
-                          borderRadius:"50%",
-                          background:col,
-                          cursor:"pointer",
-                          border:c.color===col
-                            ? "2.5px solid #fff"
-                            : "2.5px solid transparent",
-                          boxShadow:c.color===col
-                            ? "0 0 0 1px "+col
-                            : "none",
-                          transition:"all .15s"
-                        }}
-                      />
-                    ))}
-                  </div>
-                </div>
-
-                {/* Calendar Label */}
-                <div style={{ marginBottom:10 }}>
-                  <div
-                    style={{
-                      fontSize:11,
-                      color:"var(--text3)",
-                      fontWeight:600,
-                      marginBottom:5
-                    }}
-                  >
-                    LABEL
-                  </div>
-
-                  <select
-                    value={c.label || "none"}
-                    onChange={(e) =>
-                      handleLabelChange(c.id, e.target.value)
-                    }
-                    className="input"
-                    style={{
-                      fontSize:12,
-                      padding:"4px 8px",
-                      width:"100%",
-                      background:"var(--surface2)",
-                      border:"1px solid var(--border2)",
-                      borderRadius:6,
-                      color:"var(--text)",
-                      cursor:"pointer"
-                    }}
-                  >
-                    <option value="none">None</option>
-                    <option value="organization">🏢 Organization</option>
-                    <option value="subject">📚 Subject</option>
-                    <option value="personal">👤 Personal</option>
-                  </select>
-                </div>
-
-                {/* Action Buttons */}
-                <div
-                  style={{
-                    display:"flex",
-                    gap:8,
-                    flexWrap:"wrap"
-                  }}
-                >
-                  <button
-                    className="btn btn-ghost btn-sm"
-                    onClick={() =>
-                      setModal({
-                        type:"calendar-events",
-                        data:c
-                      })
-                    }
-                  >
-                    View
-                  </button>
-
-                  {c.isOwner && (
-                    <>
-                      <button
-                        className="btn btn-ghost btn-sm"
-                        onClick={() =>
-                          setModal({
-                            type:"create-event",
-                            data:{ calendarId:c.id }
-                          })
-                        }
-                      >
-                        + Event
-                      </button>
-
-                      <button
-                        className="btn btn-ghost btn-sm"
-                        onClick={() =>
-                          setModal({
-                            type:"manage-calendar",
-                            data:c
-                          })
-                        }
-                      >
-                        Manage
-                      </button>
-
-                      <button
-                        className="btn btn-danger btn-sm"
-                        onClick={() => handleDelete(c)}
-                      >
-                        Delete
-                      </button>
-                    </>
-                  )}
-                </div>
-
+      <div className="cards-grid">
+        {filtered.map(c => {
+          const evtCount = myEvents().filter(e => e.calendarId === c.id).length;
+          return (
+            <div key={c.id} className="cal-card">
+              <div style={{ position:"absolute", top:0, left:0, right:0, height:3, background:c.color, borderRadius:"14px 14px 0 0" }} />
+              <div className="cal-card-name">{c.name}</div>
+              <div className="cal-card-type">
+                {c.isOwner ? "Owner" : "Member"} · {c.description || "No description"}
               </div>
-            );
-          })}
+              <div style={{ fontSize:13, color:"var(--text2)", marginBottom:10 }}>
+                {evtCount} event{evtCount !== 1 ? "s" : ""}
+              </div>
 
-        </div>
-      )}
+              {/* Sub-feature: Calendar Color Picker */}
+              <div style={{ marginBottom:10 }}>
+                <div style={{ fontSize:11, color:"var(--text3)", fontWeight:600, marginBottom:5 }}>CALENDAR COLOR</div>
+                <div style={{ display:"flex", gap:5, flexWrap:"wrap" }}>
+                  {PALETTE.map(col => (
+                    <div key={col} onClick={() => handleColorChange(c.id, col)}
+                      style={{ width:20, height:20, borderRadius:"50%", background:col, cursor:"pointer",
+                        border:c.color===col?"2.5px solid #fff":"2.5px solid transparent",
+                        boxShadow:c.color===col?"0 0 0 1px "+col:"none", transition:"all .15s" }} />
+                  ))}
+                </div>
+              </div>
 
+              {/* Sub-feature: Calendar Label */}
+              <div style={{ marginBottom:10 }}>
+                <div style={{ fontSize:11, color:"var(--text3)", fontWeight:600, marginBottom:5 }}>LABEL</div>
+                <select
+                  value={c.label || "none"}
+                  onChange={(e) => handleLabelChange(c.id, e.target.value)}
+                  className="input"
+                  style={{ fontSize:12, padding:"4px 8px", width:"100%", background:"var(--surface2)",
+                    border:"1px solid var(--border2)", borderRadius:6, color:"var(--text)", cursor:"pointer" }}
+                >
+                  <option value="none">None</option>
+                  <option value="organization">🏢 Organization</option>
+                  <option value="subject">📚 Subject</option>
+                  <option value="personal">👤 Personal</option>
+                </select>
+              </div>
+
+              {/* Action buttons */}
+              <div style={{ display:"flex", gap:8, flexWrap:"wrap" }}>
+                <button className="btn btn-ghost btn-sm"
+                  onClick={() => setModal({ type:"calendar-events", data:c })}>View</button>
+
+                {c.isOwner && <>
+                  <button className="btn btn-ghost btn-sm"
+                    onClick={() => setModal({ type:"create-event", data:{ calendarId:c.id } })}>+ Event</button>
+                  <button className="btn btn-ghost btn-sm"
+                    onClick={() => setModal({ type:"manage-calendar", data:c })}>Manage</button>
+                  <button className="btn btn-danger btn-sm"
+                    onClick={() => handleDelete(c)}>Delete</button>
+                </>}
+              </div>
+            </div>
+          );
+        })}
+
+        {tab !== "subscribed" && (
+          <div className="cal-card"
+            style={{ border:"1.5px dashed var(--border2)", cursor:"pointer", alignItems:"center",
+              display:"flex", flexDirection:"column", justifyContent:"center", minHeight:120 }}
+            onClick={() => setModal({ type:"create-calendar" })}>
+            <div style={{ fontSize:24, marginBottom:6, opacity:.5 }}>＋</div>
+            <div style={{ color:"var(--text3)", fontSize:13, fontWeight:600 }}>Create Calendar</div>
+          </div>
+        )}
+      </div>
     </div>
-  );
-})}
-
-
-
-</div>
   );
 }
+
 // ─── CREATE CALENDAR MODAL ────────────────────────────────────────
 // Sub-feature: Create Calendar UI + Create Calendar API Integration
 function CreateCalendarModal({ ctx }) {
-  const {
-    sessionId,
-    closeModal,
-    showToast,
-    refreshCalendars,
-    currentUser,
-    loadCalPrefs,
-    saveCalPrefs,
-  } = ctx;
+  const { sessionId, closeModal, showToast, refreshCalendars, currentUser } = ctx;
   const [form, setForm] = React.useState({ name:"", description:"", color:"#6c63ff" });
   const [error, setError]   = React.useState("");
   const [loading, setLoading] = React.useState(false);
