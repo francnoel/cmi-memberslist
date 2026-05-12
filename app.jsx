@@ -462,7 +462,7 @@ async function fetchAllCalendars(sid, calPrefs, userId) {
         if (isOwner && !local.owned.includes(id)) {
           local.owned.push(id);
         }
-        console.log(calRes);
+
         calendars.push({
           id,
           name:        calRes.name,
@@ -471,7 +471,6 @@ async function fetchAllCalendars(sid, calPrefs, userId) {
           codes:       [],
           color,
           label,
-          updated_at: calRes.updatedAt,
           type:        prefs.type || (isOwner ? "personal" : "org-shared"),
           isOrgShared: !isOwner,
         });
@@ -532,7 +531,6 @@ async function fetchAllCalendars(sid, calPrefs, userId) {
         calendars.push({
           id, name: calRes.name, description: calRes.description || "",
           isOwner, codes: [], color, label,
-          updated_at: calRes.updatedAt,
           type: prefs.type || (isOwner ? "personal" : "org-shared"),
           isOrgShared: !isOwner,
         });
