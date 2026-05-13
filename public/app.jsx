@@ -972,16 +972,25 @@ function Sidebar({ page, setPage, ctx, isOpen, collapsed, setCollapsed }) {
   const ac = loadAvatarColor(currentUser.id, currentUser.name);
   const initials = nameInitials(currentUser.first_name, currentUser.last_name);
 
-  const navItems = [
-    {id:"dashboard",     icon:"⊞",  label:"Dashboard"},
-    {id:"calendar",      icon:"📅", label:"Calendar View"},
-    {id:"events",        icon:"🗓",  label:"Events List"},
-    {id:"calendars",     icon:"📚", label:"Manage Calendars"},
-    {id:"organizations", icon:"🏛",  label:"Organizations"},
-    {id:"tasks",         icon:"✅", label:"Task Tracker"},
-    {id:"ai",            icon:"✨", label:"AI Tools"},
-    {id:"settings",      icon:"⚙️", label:"Settings"},
+  const navGroups = [
+    { label: "MAIN", items: [
+      {id:"dashboard",     icon:"⊞",  label:"Dashboard"},
+    ]},
+    { label: "SCHEDULE", items: [
+      {id:"calendar",      icon:"📅", label:"Calendar View"},
+      {id:"events",        icon:"🗓",  label:"Events List"},
+      {id:"calendars",     icon:"📚", label:"Manage Calendars"},
+    ]},
+    { label: "WORKSPACE", items: [
+      {id:"organizations", icon:"🏛",  label:"Organizations"},
+      {id:"tasks",         icon:"✅", label:"Task Tracker"},
+      {id:"ai",            icon:"✨", label:"AI Tools"},
+    ]},
+    { label: "ACCOUNT", items: [
+      {id:"settings",      icon:"⚙️", label:"Settings"},
+    ]},
   ];
+  const navItems = navGroups.flatMap(g => g.items);
 
   return (
     <div className={`sidebar${isOpen ? " open" : ""}${collapsed ? " collapsed" : ""}`}>
@@ -1007,19 +1016,26 @@ function Sidebar({ page, setPage, ctx, isOpen, collapsed, setCollapsed }) {
 
       {/* Nav */}
       <div className="sidebar-nav">
-        <div className="nav-section">
-          {navItems.map(item => (
-            <div key={item.id}
-              className={`nav-item${page === item.id ? " active" : ""}${collapsed ? " nav-item-icon-only" : ""}`}
-              onClick={() => setPage(item.id)}
-              data-tutorial={`nav-${item.id}`}
-              title={collapsed ? item.label : undefined}
-            >
-              <span style={{ fontSize: 18 }}>{item.icon}</span>
-              {!collapsed && <span style={{ flex: 1 }}>{item.label}</span>}
-            </div>
-          ))}
-        </div>
+        {navGroups.map(group => (
+          <div key={group.label} className="nav-section">
+            {!collapsed && (
+              <div style={{ fontSize:10, fontWeight:700, letterSpacing:1.2, color:"var(--text3)", padding:"10px 16px 4px", userSelect:"none" }}>
+                {group.label}
+              </div>
+            )}
+            {group.items.map(item => (
+              <div key={item.id}
+                className={`nav-item${page === item.id ? " active" : ""}${collapsed ? " nav-item-icon-only" : ""}`}
+                onClick={() => setPage(item.id)}
+                data-tutorial={`nav-${item.id}`}
+                title={collapsed ? item.label : undefined}
+              >
+                <span style={{ fontSize: 18 }}>{item.icon}</span>
+                {!collapsed && <span style={{ flex: 1 }}>{item.label}</span>}
+              </div>
+            ))}
+          </div>
+        ))}
       </div>
 
       {/* Footer */}

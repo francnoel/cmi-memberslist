@@ -343,25 +343,30 @@ function TaskTrackerPage({ ctx }) {
   const toggleCheck = React.useCallback(async function toggleCheck(taskId, checkId) {
     const cal  = getTaskCal(); if (!cal) return;
     const task = tasks.find(t => t.id === taskId); if (!task) return;
-    // Save scroll for ALL cards and page before update
+    // Save checklist scroll positions for all cards before update
     const savedScrolls = {};
     Object.keys(checkScrollRefs.current).forEach(id => {
       savedScrolls[id] = checkScrollRefs.current[id] ? checkScrollRefs.current[id].scrollTop : 0;
     });
-    const savedPageY = window.scrollY;
     const newCL     = task.checklist.map(i => i.id===checkId ? {...i, checked:!i.checked} : i);
     const newStatus = computeStatus(newCL, task.status);
     const newEvent  = taskToEvent({...task, checklist:newCL, status:newStatus}, cal.id);
     try {
       const calEvts = events.filter(e=>e.calendarId===cal.id).map(e=>e.id===taskId?newEvent:e);
       await calApi("WriteCalendar", { calendarId: Number(cal.id), ical: eventsToIcalB64(calEvts) }, sessionId);
+      // Capture page scroll right before setEvents so it reflects the true
+      // current position after the await, not a stale pre-request value.
+      const savedPageY = window.scrollY;
       setEvents(prev=>prev.map(e=>e.id===taskId?newEvent:e));
-      // Restore scroll for ALL cards and page after re-render
+      // Double rAF: first lets React commit the update, second fires after
+      // the browser has fully painted — stable enough to restore scroll.
       requestAnimationFrame(() => {
-        Object.keys(savedScrolls).forEach(id => {
-          if (checkScrollRefs.current[id]) checkScrollRefs.current[id].scrollTop = savedScrolls[id];
+        requestAnimationFrame(() => {
+          Object.keys(savedScrolls).forEach(id => {
+            if (checkScrollRefs.current[id]) checkScrollRefs.current[id].scrollTop = savedScrolls[id];
+          });
+          window.scrollTo({ top: savedPageY, behavior: "instant" });
         });
-        window.scrollTo({ top: savedPageY, behavior: "instant" });
       });
     } catch(e) { showToast("Failed to update.", "error"); }
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -515,6 +520,7 @@ function TaskTrackerPage({ ctx }) {
               {task.checklist.map(item => (
                 <div key={item.id} style={{ display:"flex", alignItems:"center", gap:8, padding:"6px 10px", borderBottom:"1px solid var(--border)" }}>
                   <input type="checkbox" checked={item.checked} onChange={()=>onToggleCheck(task.id,item.id)}
+                    onFocus={e => e.target.blur()}
                     style={{ accentColor:"var(--accent)", width:14, height:14, flexShrink:0, cursor:"pointer" }} />
                   <span style={{ fontSize:12, textDecoration:item.checked?"line-through":"none", color:item.checked?"var(--text3)":"var(--text)", flex:1, lineHeight:1.4 }}>{item.label}</span>
                 </div>
@@ -532,12 +538,12 @@ function TaskTrackerPage({ ctx }) {
   // time any state in the parent changes — which was causing all SubjectBars
   // and ChecklistBars to reset to 0 and re-animate on every checkbox tick.
   const SubjectView = React.useCallback(function SubjectView() {
-    const subjects = [...new Set(filtered.map(t => t.subject||"(No Subject)"))].sort();
+    const subjects = [...new Map(filtered.map(t => [(t.subject||"(No Subject)").toLowerCase(), t.subject||"(No Subject)"])).values()].sort();
     if (subjects.length === 0) return <EmptyState />;
     return subjects.map(subj => {
       const key    = `subj_${subj}`;
       const isCol  = collapsed[key];
-      const subjTasks = filtered.filter(t => (t.subject||"(No Subject)") === subj);
+      const subjTasks = filtered.filter(t => (t.subject||"(No Subject)").toLowerCase() === subj.toLowerCase());
       const done   = subjTasks.filter(t=>t.status==="done").length;
       const pct    = subjTasks.length ? Math.round((done/subjTasks.length)*100) : 0;
       return (
